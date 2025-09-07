@@ -357,7 +357,7 @@
 
         // This function calls the Gemini API
         async function generateText(prompt, apiKey) {
-            const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${apiKey}`;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
             
             const payload = {
                 contents: [{
@@ -420,6 +420,4 @@
     </script>
 </body>
 </html>
-
-
 
