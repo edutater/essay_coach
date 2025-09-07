@@ -340,6 +340,8 @@
                     errorMessage = "<b>Error: Invalid API Key.</b><br>The API key is likely invalid or malformed. Please double-check that you have copied the entire key correctly.";
                 } else if (error.message.includes("403")) {
                     errorMessage = "<b>Error: API Key Rejected.</b><br>Please check your API key settings in your Google Cloud project. This can happen if the key is restricted to the wrong website URL, if the Generative Language API is not enabled, or if billing is not enabled on your project.";
+                } else if (error.message.includes("404")) {
+                    errorMessage = "<b>Error: API Endpoint Not Found.</b><br>The service could not be reached at the specified URL. The API may be temporarily unavailable or the endpoint has changed.";
                 } else if (error.message.includes("429")) {
                     errorMessage = "<b>Error: Too Many Requests.</b><br>You have exceeded the free usage limit for your key. Please wait a moment before trying again.";
                 } else if (error.message.includes("API call failed")) {
@@ -355,7 +357,7 @@
 
         // This function calls the Gemini API
         async function generateText(prompt, apiKey) {
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${apiKey}`;
             
             const payload = {
                 contents: [{
@@ -418,3 +420,6 @@
     </script>
 </body>
 </html>
+
+
+
