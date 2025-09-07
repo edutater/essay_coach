@@ -52,6 +52,13 @@
             <p class="mt-2 text-md sm:text-lg text-slate-600">Get instant feedback from an AI Admissions Director & Essay Coach</p>
         </header>
 
+        <!-- API Key Input -->
+        <div class="bg-white p-6 rounded-xl shadow-md mb-8">
+            <label for="api-key-input" class="block text-lg font-semibold text-slate-800 mb-2">Enter Your Gemini API Key</label>
+            <input type="password" id="api-key-input" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition" placeholder="Paste your API key here">
+            <p class="mt-2 text-sm text-slate-500">You can get a free API key from <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-teal-600 hover:underline font-semibold">Google AI Studio</a>.</p>
+        </div>
+
         <!-- Essay Input Section -->
         <div class="bg-white p-6 rounded-xl shadow-md">
             <!-- Personalization -->
@@ -131,6 +138,7 @@
         // --- Element References ---
         const analyzeButton = document.getElementById('analyze-button');
         const essayInput = document.getElementById('essay-input');
+        const apiKeyInput = document.getElementById('api-key-input');
         const studentNameInput = document.getElementById('student-name');
         const selectivityLevel = document.getElementById('selectivity-level');
         const directorCard = document.getElementById('director-feedback-card');
@@ -287,6 +295,17 @@
             const essayText = essayInput.value;
             const selectedLevel = selectivityLevel.value;
             const studentName = studentNameInput.value.trim();
+            const userApiKey = apiKeyInput.value.trim();
+
+            if (!userApiKey) {
+                pdfStatus.textContent = 'Please enter your Gemini API key to proceed.';
+                pdfStatus.classList.add('text-red-500', 'font-semibold');
+                setTimeout(() => { 
+                    pdfStatus.textContent = '';
+                    pdfStatus.classList.remove('text-red-500', 'font-semibold'); 
+                }, 4000);
+                return;
+            }
 
             if (countWords(essayText) < 50) {
                 pdfStatus.textContent = 'Please enter an essay of at least 50 words.';
@@ -303,13 +322,13 @@
             try {
                 // --- Step 1: Get Admissions Director Feedback ---
                 const directorPrompt = getDirectorPrompt(essayText, selectedLevel, studentName);
-                const directorResponse = await generateText(directorPrompt);
+                const directorResponse = await generateText(directorPrompt, userApiKey);
                 directorContent.innerHTML = formatResponse(directorResponse);
                 directorCard.classList.remove('hidden');
 
                 // --- Step 2: Get Essay Coach Feedback ---
                 const coachPrompt = getCoachPrompt(essayText, directorResponse, studentName);
-                const coachResponse = await generateText(coachPrompt);
+                const coachResponse = await generateText(coachPrompt, userApiKey);
                 coachContent.innerHTML = formatResponse(coachResponse);
                 coachCard.classList.remove('hidden');
 
@@ -322,9 +341,8 @@
             }
         });
 
-        // This function calls the Gemini API with exponential backoff
-        async function generateText(prompt) {
-            const apiKey = ""; // Leave empty, handled by the environment
+        // This function calls the Gemini API
+        async function generateText(prompt, apiKey) {
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
             
             const payload = {
@@ -337,39 +355,14 @@
                 }
             };
 
-            let response;
-            let retries = 3;
-            let delay = 1000;
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 
-            while (retries > 0) {
-                try {
-                    response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (response.ok) {
-                        break; // Success
-                    } else if (response.status === 429 || response.status >= 500) {
-                        // Log and retry for rate limiting or server errors
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                        delay *= 2;
-                        retries--;
-                    } else {
-                        // Don't retry for other client errors (e.g., 400 Bad Request)
-                        throw new Error(`API call failed with status: ${response.status}`);
-                    }
-                } catch (error) {
-                    // Log and retry for network errors
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    delay *= 2;
-                    retries--;
-                }
-            }
-
-            if (!response || !response.ok) {
-                throw new Error(`API call failed after multiple retries.`);
+            if (!response.ok) {
+                throw new Error(`API call failed with status: ${response.status}`);
             }
 
             const result = await response.json();
@@ -387,48 +380,28 @@
             }
         }
 
-        // Improved formatting to handle paragraphs and markdown lists from the AI
+        // Basic formatting to handle markdown-like syntax from the AI
         function formatResponse(text) {
-            // First, handle markdown-style bolding
-            let html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+             let html = text
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
+                .replace(/(\n|^)\* (.*?)/g, '$1<li>$2</li>'); // List items that start with *
+
+            // Wrap list items in <ul> tags
+            if (html.includes('<li>')) {
+                 const listItems = html.match(/<li>.*?<\/li>/g).join('');
+                 const restOfHtml = html.replace(/<li>.*?<\/li>/g, '');
+                 html = restOfHtml.replace(/(\r\n|\n|\r)/gm, "<br>") + '<ul>' + listItems + '</ul>';
+            } else {
+                 html = html.replace(/(\r\n|\n|\r)/gm, "<br>");
+            }
+
+            // Clean up extra line breaks around lists
+            html = html.replace(/<br><ul>/g, '<ul>').replace(/<\/ul><br>/g, '</ul>');
             
-            const lines = html.split('\n');
-            let formattedHtml = '';
-            let inList = false;
-
-            for (const line of lines) {
-                const trimmedLine = line.trim();
-                
-                // Check for list items starting with * or a number.
-                if (/^(\*|\d+\.)\s/.test(trimmedLine)) {
-                    if (!inList) {
-                        // Start a new list
-                        formattedHtml += '<ul>';
-                        inList = true;
-                    }
-                    // Add the list item, removing the markdown character
-                    formattedHtml += `<li>${trimmedLine.substring(trimmedLine.indexOf(' ') + 1).trim()}</li>`;
-                } else {
-                    if (inList) {
-                        // End the current list
-                        formattedHtml += '</ul>';
-                        inList = false;
-                    }
-                    if (trimmedLine) {
-                        // Treat non-list, non-empty lines as paragraphs
-                        formattedHtml += `<p>${trimmedLine}</p>`;
-                    }
-                }
-            }
-
-            // If the text ends with a list, close the ul tag
-            if (inList) {
-                formattedHtml += '</ul>';
-            }
-
-            return formattedHtml;
+            return html;
         }
 
     </script>
 </body>
 </html>
+
