@@ -334,7 +334,19 @@
 
             } catch (error) {
                 console.error("Error analyzing essay:", error);
-                directorContent.innerHTML = "<p class='text-red-500'>An error occurred while analyzing the essay. Please try again.</p>";
+                let errorMessage = "An error occurred while analyzing the essay. Please try again.";
+
+                if (error.message.includes("400")) {
+                    errorMessage = "<b>Error: Invalid API Key.</b><br>The API key is likely invalid or malformed. Please double-check that you have copied the entire key correctly.";
+                } else if (error.message.includes("403")) {
+                    errorMessage = "<b>Error: API Key Rejected.</b><br>Please check your API key settings in your Google Cloud project. This can happen if the key is restricted to the wrong website URL, if the Generative Language API is not enabled, or if billing is not enabled on your project.";
+                } else if (error.message.includes("429")) {
+                    errorMessage = "<b>Error: Too Many Requests.</b><br>You have exceeded the free usage limit for your key. Please wait a moment before trying again.";
+                } else if (error.message.includes("API call failed")) {
+                    errorMessage = `<b>An error occurred.</b><br>The server responded with an unexpected status. Please check the developer console for more details.`;
+                }
+                
+                directorContent.innerHTML = `<p class='text-red-500'>${errorMessage}</p>`;
                 directorCard.classList.remove('hidden');
             } finally {
                 loadingIndicator.classList.add('hidden');
@@ -362,6 +374,8 @@
             });
 
             if (!response.ok) {
+                const errorBody = await response.text();
+                console.error("Full API Error Response:", errorBody);
                 throw new Error(`API call failed with status: ${response.status}`);
             }
 
@@ -404,4 +418,3 @@
     </script>
 </body>
 </html>
-
