@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admissions Essay Reader</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .prose-custom {
+            color: #334155; /* slate-700 */
+        }
+        .prose-custom h3 {
+            color: #0f172a; /* slate-900 */
+            font-weight: 600;
+        }
+        .prose-custom p {
+            margin-top: 0.5rem;
+            line-height: 1.6;
+        }
+        .prose-custom ul {
+            list-style-type: disc;
+            padding-left: 1.5rem;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+        .prose-custom li {
+            margin-bottom: 0.5rem;
+        }
+        .prose-custom strong {
+            font-weight: 600;
+        }
+        #loading-spinner {
+            border-top-color: #0d9488; /* teal-600 */
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-4xl">
+        
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-slate-900">Admissions Essay Reader</h1>
+            <p class="mt-2 text-md sm:text-lg text-slate-600">Get instant feedback from an AI Admissions Director & Essay Coach</p>
+        </header>
+
+        <!-- Essay Input Section -->
+        <div class="bg-white p-6 rounded-xl shadow-md">
+            <!-- Personalization -->
+            <div class="mb-4">
+                <label for="student-name" class="block text-lg font-semibold text-slate-800 mb-2">What's your preferred name? (Optional)</label>
+                <input type="text" id="student-name" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition" placeholder="e.g., Alex">
+            </div>
+            
+            <!-- Selectivity Dropdown -->
+            <div class="mb-4">
+                <label for="selectivity-level" class="block text-lg font-semibold text-slate-800 mb-2">Choose the selectivity level of your target school:</label>
+                <select id="selectivity-level" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition">
+                    <option value="most_selective">Most Selective (e.g., Ivy League, UChicago, Vanderbilt)</option>
+                    <option value="highly_selective">Highly Selective (e.g., UMich, Wake Forest, UVA)</option>
+                    <option value="selective">Selective (e.g., UGA, Clemson, Major Public Universities)</option>
+                </select>
+            </div>
+            
+            <label for="essay-input" class="block text-lg font-semibold text-slate-800 mb-2">Paste your essay or upload a file:</label>
+            <textarea id="essay-input" rows="15" class="w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition" placeholder="Start writing, paste your essay, or upload a PDF..."></textarea>
+            
+            <!-- Word Count -->
+            <div class="flex justify-end items-center mt-2 space-x-3">
+                <span id="word-count-warning" class="text-sm text-amber-600 font-medium hidden">Recommended maximum is 650 words.</span>
+                <span id="word-count-display" class="text-sm text-slate-500 font-medium">0 words</span>
+            </div>
+
+            <div class="flex justify-between items-center mt-4">
+                <!-- PDF Upload Button -->
+                <div class="flex items-center">
+                    <input type="file" id="pdf-upload-input" class="hidden" accept=".pdf">
+                    <button id="pdf-upload-button" class="bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400 transition disabled:opacity-50">
+                        Upload PDF
+                    </button>
+                    <span id="pdf-status" class="ml-3 text-sm text-slate-600"></span>
+                </div>
+                <!-- Analyze Button -->
+                <button id="analyze-button" class="bg-teal-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-transform transform hover:scale-105">
+                    Analyze My Essay
+                </button>
+            </div>
+        </div>
+
+        <!-- Feedback Section -->
+        <div id="feedback-container" class="mt-8 space-y-8">
+            <!-- Loading Indicator -->
+            <div id="loading-indicator" class="hidden text-center">
+                 <div class="inline-block w-8 h-8 border-4 rounded-full" id="loading-spinner" role="status"></div>
+                 <p class="mt-2 text-slate-600">Analyzing... Please wait.</p>
+            </div>
+            
+            <!-- Admissions Director Feedback -->
+            <div id="director-feedback-card" class="bg-white p-6 rounded-xl shadow-md hidden">
+                <h2 class="text-2xl font-bold text-slate-900 border-b border-slate-200 pb-3 mb-4 flex items-center">
+                    <svg class="w-6 h-6 mr-3 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                    Admissions Director's Read
+                </h2>
+                <div id="director-feedback-content" class="prose-custom">
+                    <!-- AI-generated feedback will appear here -->
+                </div>
+            </div>
+
+            <!-- Essay Coach Feedback -->
+            <div id="coach-feedback-card" class="bg-white p-6 rounded-xl shadow-md hidden">
+                <h2 class="text-2xl font-bold text-slate-900 border-b border-slate-200 pb-3 mb-4 flex items-center">
+                     <svg class="w-6 h-6 mr-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                    Essay Coach's Notes
+                </h2>
+                <div id="coach-feedback-content" class="prose-custom">
+                    <!-- AI-generated feedback will appear here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Element References ---
+        const analyzeButton = document.getElementById('analyze-button');
+        const essayInput = document.getElementById('essay-input');
+        const studentNameInput = document.getElementById('student-name');
+        const selectivityLevel = document.getElementById('selectivity-level');
+        const directorCard = document.getElementById('director-feedback-card');
+        const coachCard = document.getElementById('coach-feedback-card');
+        const directorContent = document.getElementById('director-feedback-content');
+        const coachContent = document.getElementById('coach-feedback-content');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const pdfUploadButton = document.getElementById('pdf-upload-button');
+        const pdfUploadInput = document.getElementById('pdf-upload-input');
+        const pdfStatus = document.getElementById('pdf-status');
+        const wordCountDisplay = document.getElementById('word-count-display');
+        const wordCountWarning = document.getElementById('word-count-warning');
+
+        // --- Word Count Logic ---
+        function countWords(text) {
+            if (!text) return 0;
+            return text.trim().split(/\s+/).filter(Boolean).length;
+        }
+
+        function updateWordCount() {
+            const text = essayInput.value;
+            const wordCount = countWords(text);
+            wordCountDisplay.textContent = `${wordCount} words`;
+            if (wordCount > 650) {
+                wordCountDisplay.classList.add('text-red-500', 'font-semibold');
+                wordCountWarning.classList.remove('hidden');
+            } else {
+                wordCountDisplay.classList.remove('text-red-500', 'font-semibold');
+                wordCountWarning.classList.add('hidden');
+            }
+        }
+        essayInput.addEventListener('input', updateWordCount);
+
+        // --- PDF Upload Logic ---
+        if (window.pdfjsLib) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
+        }
+        pdfUploadButton.addEventListener('click', () => pdfUploadInput.click());
+        pdfUploadInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file || file.type !== 'application/pdf') {
+                pdfStatus.textContent = 'Please select a PDF file.';
+                setTimeout(() => { pdfStatus.textContent = '' }, 3000);
+                return;
+            }
+            pdfStatus.textContent = 'Reading PDF...';
+            pdfUploadButton.disabled = true;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const typedarray = new Uint8Array(e.target.result);
+                    const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                    let fullText = '';
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        const pageText = textContent.items.map(item => item.str).join(' ');
+                        fullText += pageText + '\n\n';
+                    }
+                    essayInput.value = fullText.trim();
+                    pdfStatus.textContent = 'PDF loaded successfully!';
+                    setTimeout(() => { pdfStatus.textContent = '' }, 3000);
+                } catch (error) {
+                    console.error('Error parsing PDF:', error);
+                    pdfStatus.textContent = 'Failed to read PDF.';
+                } finally {
+                    pdfUploadButton.disabled = false;
+                    pdfUploadInput.value = ''; 
+                    updateWordCount();
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        // --- Prompt Generation ---
+        function getDirectorPrompt(essayText, level, studentName) {
+            let persona;
+            const personalization = studentName 
+                ? `You are speaking directly to a student named ${studentName}. Address them by their name in your feedback.` 
+                : `You are speaking directly to the student.`;
+
+            switch(level) {
+                case 'most_selective':
+                    persona = `You are an experienced, highly discerning Director of Admissions at an Ivy League-caliber university. ${personalization} You read thousands of essays from valedictorians and students with perfect scores. You have 30 seconds to read this essay and decide if this student has the intellectual vitality, unique perspective, and profound self-awareness to thrive among the world's brightest students. Your goal is to find a reason to advocate for them in a hyper-competitive committee.
+
+                    Your analysis must be brutally honest and focus on:
+                    1.  **Intellectual Vitality:** Does the essay reveal a mind that is curious, analytical, and genuinely excited by ideas? Is there evidence of deep thinking?
+                    2.  **Uniqueness & Voice:** Is this a story only this student could tell? Does it stand out from the thousands of other essays on similar topics?
+                    3.  **Profound Self-Reflection:** Does the student move beyond describing an event to analyzing its meaning and impact on their worldview? Is the "so what" factor exceptionally strong?
+                    4.  **Major Red Flags:** Immediately discount essays that use clichés (mission trips, sports injuries), sound entitled, or are just a list of accomplishments.`;
+                    break;
+                case 'highly_selective':
+                    persona = `You are a thoughtful Director of Admissions at a highly selective university (e.g., UMich, UVA). ${personalization} You are looking for students who are not only academically prepared but will also be active, engaged, and positive members of the campus community. You have a minute to read this essay.
+
+                    Your analysis should be critical but constructive, focusing on:
+                    1.  **Character & Personality:** What does this essay tell me about the student's character, values, and personality? Would they be a good roommate or project partner?
+                    2.  **Authenticity & Growth:** Does the essay feel genuine? Does the student demonstrate meaningful growth or self-awareness from their experience?
+                    3.  **"So What?" Factor:** Is it clear why this story is important to the student? Do I understand how it has shaped them?
+                    4.  **Red Flags:** Note any common clichés, lack of reflection, or a tone that seems arrogant or disingenuous.`;
+                    break;
+                case 'selective':
+                    persona = `You are a friendly but busy Director of Admissions at a large, selective public university. ${personalization} Your main goal is to ensure the student is a good writer, has positive character traits, and is ready for college-level work. You are looking for reasons to admit, not to deny.
+
+                    Your analysis should be straightforward and encouraging, focusing on:
+                    1.  **Clarity & Cohesion:** Is the essay well-written, clear, and easy to follow? Does it tell a coherent story?
+                    2.  **Positive Attributes:** Does the student come across as kind, responsible, and thoughtful? Does the essay highlight positive qualities?
+                    3.  **Sincerity:** Does the essay feel sincere? Even if the topic is common, is the student's voice present?
+                    4.  **Basic Red Flags:** Does the essay have major grammatical errors, an inappropriate tone, or discuss questionable behavior without reflection?`;
+                    break;
+            }
+
+            return `${persona}
+
+                Based on your analysis, write a concise, direct, and professional summary of your impressions in that specific role. Start with a clear, one-sentence takeaway. Then, elaborate in a few paragraphs. Be honest and critical from your specific viewpoint, but not cruel.
+
+                Essay:
+                ---
+                ${essayText}
+                ---
+            `;
+        }
+
+        function getCoachPrompt(essayText, directorResponse, studentName) {
+            const studentIdentifier = studentName || 'the student';
+            const studentPossessive = studentName ? `${studentName}'s` : 'the student\'s';
+
+            return `
+                You are a supportive, insightful, and strategic essay coach. You have just seen the Admissions Director's feedback on ${studentPossessive} essay. Your job is to help ${studentIdentifier} improve their draft based on that feedback and general best practices.
+
+                First, briefly acknowledge the Director's main point. Then, provide specific, actionable advice. Do NOT rewrite the essay for them. Your feedback should be structured and easy to follow. Address ${studentIdentifier} directly.
+
+                Provide feedback in the following format:
+                1.  **Overall Strategy:** What is the single biggest opportunity for improvement? (e.g., focusing on a different part of the story, deepening the reflection).
+                2.  **Actionable Suggestions (Bulleted List):** Provide 3-5 concrete suggestions. For each, mention a specific part of the essay if possible. Examples:
+                    * "In paragraph 2, instead of saying you 'learned leadership,' could you tell a short story about a specific moment where you had to lead?"
+                    * "The opening sentence is a bit generic. Try starting with the moment of tension right in the middle of the action."
+                    * "The reflection at the end feels rushed. Ask yourself 'why' three times to get to a deeper insight. Why did this matter? Why was that important to you? Why did that change you?"
+                3.  **Encouraging Closing:** End with a positive and motivating statement about the potential of their story.
+
+                Admissions Director's Feedback:
+                ---
+                ${directorResponse}
+                ---
+                
+                Original Essay:
+                ---
+                ${essayText}
+                ---
+            `;
+        }
+
+        // --- Essay Analysis Logic ---
+        analyzeButton.addEventListener('click', async () => {
+            const essayText = essayInput.value;
+            const selectedLevel = selectivityLevel.value;
+            const studentName = studentNameInput.value.trim();
+
+            if (countWords(essayText) < 50) {
+                pdfStatus.textContent = 'Please enter an essay of at least 50 words.';
+                setTimeout(() => { pdfStatus.textContent = '' }, 3000);
+                return;
+            }
+
+            loadingIndicator.classList.remove('hidden');
+            directorCard.classList.add('hidden');
+            coachCard.classList.add('hidden');
+            directorContent.innerHTML = '';
+            coachContent.innerHTML = '';
+
+            try {
+                // --- Step 1: Get Admissions Director Feedback ---
+                const directorPrompt = getDirectorPrompt(essayText, selectedLevel, studentName);
+                const directorResponse = await generateText(directorPrompt);
+                directorContent.innerHTML = formatResponse(directorResponse);
+                directorCard.classList.remove('hidden');
+
+                // --- Step 2: Get Essay Coach Feedback ---
+                const coachPrompt = getCoachPrompt(essayText, directorResponse, studentName);
+                const coachResponse = await generateText(coachPrompt);
+                coachContent.innerHTML = formatResponse(coachResponse);
+                coachCard.classList.remove('hidden');
+
+            } catch (error) {
+                console.error("Error analyzing essay:", error);
+                directorContent.innerHTML = "<p class='text-red-500'>An error occurred while analyzing the essay. Please try again.</p>";
+                directorCard.classList.remove('hidden');
+            } finally {
+                loadingIndicator.classList.add('hidden');
+            }
+        });
+
+        // This function calls the Gemini API with exponential backoff
+        async function generateText(prompt) {
+            const apiKey = ""; // Leave empty, handled by the environment
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            
+            const payload = {
+                contents: [{
+                    parts: [{ text: prompt }]
+                }],
+                generationConfig: {
+                    temperature: 0.6,
+                    topP: 0.9,
+                }
+            };
+
+            let response;
+            let retries = 3;
+            let delay = 1000;
+
+            while (retries > 0) {
+                try {
+                    response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        break; // Success
+                    } else if (response.status === 429 || response.status >= 500) {
+                        // Log and retry for rate limiting or server errors
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2;
+                        retries--;
+                    } else {
+                        // Don't retry for other client errors (e.g., 400 Bad Request)
+                        throw new Error(`API call failed with status: ${response.status}`);
+                    }
+                } catch (error) {
+                    // Log and retry for network errors
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2;
+                    retries--;
+                }
+            }
+
+            if (!response || !response.ok) {
+                throw new Error(`API call failed after multiple retries.`);
+            }
+
+            const result = await response.json();
+            
+            if (result.candidates && result.candidates.length > 0 &&
+                result.candidates[0].content && result.candidates[0].content.parts &&
+                result.candidates[0].content.parts.length > 0) {
+                return result.candidates[0].content.parts[0].text;
+            } else {
+                console.warn("API returned unexpected structure:", result);
+                if (result.promptFeedback && result.promptFeedback.blockReason) {
+                    return `The analysis could not be completed. Reason: ${result.promptFeedback.blockReason}. Please revise the essay to avoid any sensitive content and try again.`;
+                }
+                return "Could not generate feedback. The model returned an empty response.";
+            }
+        }
+
+        // Improved formatting to handle paragraphs and markdown lists from the AI
+        function formatResponse(text) {
+            // First, handle markdown-style bolding
+            let html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            
+            const lines = html.split('\n');
+            let formattedHtml = '';
+            let inList = false;
+
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                
+                // Check for list items starting with * or a number.
+                if (/^(\*|\d+\.)\s/.test(trimmedLine)) {
+                    if (!inList) {
+                        // Start a new list
+                        formattedHtml += '<ul>';
+                        inList = true;
+                    }
+                    // Add the list item, removing the markdown character
+                    formattedHtml += `<li>${trimmedLine.substring(trimmedLine.indexOf(' ') + 1).trim()}</li>`;
+                } else {
+                    if (inList) {
+                        // End the current list
+                        formattedHtml += '</ul>';
+                        inList = false;
+                    }
+                    if (trimmedLine) {
+                        // Treat non-list, non-empty lines as paragraphs
+                        formattedHtml += `<p>${trimmedLine}</p>`;
+                    }
+                }
+            }
+
+            // If the text ends with a list, close the ul tag
+            if (inList) {
+                formattedHtml += '</ul>';
+            }
+
+            return formattedHtml;
+        }
+
+    </script>
+</body>
+</html>
