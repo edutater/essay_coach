@@ -325,7 +325,7 @@
         // This function calls the Gemini API with exponential backoff
         async function generateText(prompt) {
             const apiKey = ""; // Leave empty, handled by the environment
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
             
             const payload = {
                 contents: [{
@@ -432,4 +432,3 @@
     </script>
 </body>
 </html>
-
